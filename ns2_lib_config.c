@@ -50,8 +50,10 @@ ns2_config_status_t ns2_config_validate(const ns2_device_config_s *cfg)
     {
         return NS2_CONFIG_NOT_CONFIGURED;
     }
-    /* Only the Pro Controller 2 report/command layout is implemented so far. */
-    if (cfg->type != NS2_DEVTYPE_PRO2)
+    /* Implemented: the Pro Controller 2 over BLE, the GameCube controller over USB. */
+    bool pro2_ble = cfg->type == NS2_DEVTYPE_PRO2 && cfg->transport == NS2_TRANSPORT_BLE;
+    bool gc_usb = cfg->type == NS2_DEVTYPE_GC && cfg->transport == NS2_TRANSPORT_USB;
+    if (!pro2_ble && !gc_usb)
     {
         return NS2_CONFIG_UNSUPPORTED;
     }
@@ -134,6 +136,16 @@ void ns2_config_set_host_mac(const uint8_t mac[6])
 bool ns2_config_has_host(void)
 {
     return !_ns2_mac_is_zero(s_ns2_device_config.host_mac);
+}
+
+ns2_devtype_t ns2_config_get_type(void)
+{
+    return (ns2_devtype_t)s_ns2_device_config.type;
+}
+
+uint8_t ns2_config_get_usb_pairing(void)
+{
+    return s_ns2_device_config.usb_pairing;
 }
 
 ns2_transport_t ns2_config_get_transport(void)

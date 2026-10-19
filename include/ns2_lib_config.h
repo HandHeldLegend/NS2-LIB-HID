@@ -60,6 +60,12 @@ void ns2_config_set_host_mac(const uint8_t mac[6]);
 /** @brief true when a non-zero host address is configured. */
 bool ns2_config_has_host(void);
 
+/** @brief The configured @ref ns2_devtype_t. */
+ns2_devtype_t ns2_config_get_type(void);
+
+/** @brief The configured @ref ns2_usb_pairing_t. */
+uint8_t ns2_config_get_usb_pairing(void);
+
 ns2_transport_t ns2_config_get_transport(void);
 
 #ifdef __cplusplus

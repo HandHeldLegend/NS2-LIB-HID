@@ -1,10 +1,11 @@
 /**
  * @file ns2_lib_usb.h
- * @brief USB transport entry points (stubs — not implemented yet).
+ * @brief USB transport: the GameCube controller (NSO) on a Switch 2.
  *
- * Switch 2 controllers also talk to the console over USB, using the same command set on a
- * vendor bulk interface alongside a HID interface. These functions reserve the API shape so
- * firmware can wire a USB stack now; they currently report "unsupported".
+ * Over USB the controller is a HID interface (input report 0x0A every 4 ms, output reports) beside a
+ * vendor interface whose bulk endpoints carry the same command set as BLE. Before the first command
+ * the console makes three vendor control requests. The firmware owns the USB stack: it serves these
+ * descriptors, passes control requests and bulk commands here, and sends what comes back.
  *
  * Copyright (c) 2026 Mitchell Cairns, Hand Held Legend, LLC.
  *
@@ -30,26 +31,37 @@
 extern "C" {
 #endif
 
-/**
- * @brief Get USB descriptors for the configured device (stub).
- *
- * @return false — USB descriptors are not implemented yet; all outputs are set to NULL / 0.
- */
-bool ns2_usb_get_descriptor_params(const uint8_t **device_descriptor, const uint8_t **config_descriptor,
-                                   const uint8_t **hid_report_descriptor, uint16_t *hid_report_descriptor_len);
+/** Largest reply to a bulk command: header, memory read arguments and data. */
+#define NS2_USB_COMMAND_REPLY_MAX 136u
 
 /**
- * @brief Forward a command received on the USB bulk OUT endpoint (stub).
- *
- * @param out Response buffer.
- * @return Response length; always 0 until USB is implemented.
+ * @brief Descriptors for the configured device. Any pointer may be NULL.
+ * @return false when the configured device has no USB form.
+ */
+bool ns2_usb_get_descriptor_params(const uint8_t **device_descriptor, const uint8_t **config_descriptor,
+                                   uint16_t *config_descriptor_len, const uint8_t **hid_report_descriptor,
+                                   uint16_t *hid_report_descriptor_len);
+
+/**
+ * @brief A vendor control request to the device.
+ * @return Bytes written to @p out for an IN request, 0 for an OUT request answered with a bare
+ *         status, or -1 to stall (unknown request).
+ */
+int16_t ns2_usb_vendor_request(uint8_t request, uint16_t value, uint8_t *out, uint16_t out_size);
+
+/** @brief The console (re)configured the device: start over. */
+void ns2_usb_reset(void);
+
+/**
+ * @brief A command from the bulk OUT endpoint.
+ * @param out Reply, at least @ref NS2_USB_COMMAND_REPLY_MAX bytes.
+ * @return Reply length for the bulk IN endpoint; 0 sends nothing.
  */
 uint16_t ns2_usb_process_command(const uint8_t *data, uint16_t len, uint8_t *out, uint16_t out_size);
 
 /**
- * @brief Build one USB HID input report (stub).
- *
- * @return false — not implemented yet.
+ * @brief The next input report (report ID first).
+ * @return false until the console initialised the controller.
  */
 bool ns2_usb_generate_inputreport(uint8_t *data, uint16_t *len);
 

@@ -297,7 +297,9 @@ static uint16_t _ns2_cmd_fw_info(uint8_t sub, uint8_t *out)
     }
     /* Firmware 2.1.4 | type | BT patch 12.0.0 | pad | DSP 2.3.0 | pad (retail Pro Controller 2). */
     static const uint8_t fw_info[12] = {0x02, 0x01, 0x04, 0x02, 0x0C, 0x00, 0x00, 0x00, 0x00, 0x02, 0x03, 0x00};
-    memcpy(out, fw_info, sizeof(fw_info));
+    /* Firmware 1.1.2 | type | BT patch 12.0.0 | pad | no DSP (retail GameCube controller). */
+    static const uint8_t fw_info_gc[12] = {0x01, 0x01, 0x02, 0x03, 0x0C, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF};
+    memcpy(out, (ns2_config_get_type() == NS2_DEVTYPE_GC) ? fw_info_gc : fw_info, sizeof(fw_info));
     out[3] = ns2_config_get_fw_type();
     return sizeof(fw_info);
 }
@@ -466,6 +468,16 @@ uint16_t ns2_protocol_process_command(const uint8_t *cmd, uint16_t len, uint8_t 
         break;
 
     case NS2_CMD_INIT:
+        /* Initialise USB: input reports start (the console's address in it may be anything) */
+        if (sub == 0x0Du)
+        {
+            static const uint8_t r[] = {0x01, 0x00, 0x00, 0x00};
+            memcpy(resp, r, sizeof(r));
+            resp_len = sizeof(r);
+            s_ns2.reporting = true;
+        }
+        break;
+
     default:
         /* Unknown or data-less commands are acknowledged with a bare header. */
         break;
@@ -606,6 +618,11 @@ uint16_t ns2_protocol_ble_read(uint16_t handle, uint16_t offset, uint8_t *buffer
 
 /* --- Input report --- */
 
+bool ns2_protocol_reporting(void)
+{
+    return s_ns2.reporting;
+}
+
 static void _ns2_pack_stick(uint8_t out[3], uint16_t x, uint16_t y)
 {
     x &= 0x0FFFu;
@@ -657,6 +674,52 @@ bool ns2_protocol_generate_inputreport(uint8_t data[NS2_INPUT_REPORT_SIZE])
     data[0x0D] = 0x00; /* Headset audio state: none */
     /* Motion data format is not decoded yet; report the block as present but zeroed. */
     data[0x0E] = (s_ns2.features_enabled & NS2_FEATURE_IMU) ? 0x28u : 0x00u;
+
+    return true;
+}
+
+bool ns2_protocol_generate_gc_report(uint8_t data[NS2_GC_USB_REPORT_SIZE])
+{
+    if (data == NULL || !s_ns2.reporting)
+    {
+        return false;
+    }
+
+    ns2_input_s in;
+    memset(&in, 0, sizeof(in));
+    in.ls_x = 2048;
+    in.ls_y = 2048;
+    in.rs_x = 2048;
+    in.rs_y = 2048;
+    ns2_api_hook_get_input(&in);
+
+    ns2_powerstatus_s pwr = {NS2_POWERSRC_EXTERNAL, NS2_CHARGING_IDLE, 9};
+    ns2_api_hook_get_powerstatus(&pwr);
+    uint8_t level = (pwr.battery_level > 9u) ? 9u : pwr.battery_level;
+
+    memset(data, 0, NS2_GC_USB_REPORT_SIZE);
+
+    /* Report 0x0A: the Pro Controller 2 layout one byte later, then the analog triggers. */
+    data[0] = NS2_GC_USB_REPORT_ID;
+    data[1] = s_ns2.counter++;
+    data[2] = (uint8_t)((pwr.power_source == NS2_POWERSRC_EXTERNAL ? 0x01u : 0x00u) |
+                        (pwr.charging_status == NS2_CHARGING_ACTIVE ? 0x02u : 0x00u) |
+                        (uint8_t)(level << 2));
+
+    data[3] = (uint8_t)((in.b ? 0x01u : 0u) | (in.a ? 0x02u : 0u) | (in.y ? 0x04u : 0u) | (in.x ? 0x08u : 0u) |
+                        (in.r ? 0x10u : 0u) | (in.zr ? 0x20u : 0u) | (in.plus ? 0x40u : 0u) | (in.r_js ? 0x80u : 0u));
+    data[4] = (uint8_t)((in.down ? 0x01u : 0u) | (in.right ? 0x02u : 0u) | (in.left ? 0x04u : 0u) |
+                        (in.up ? 0x08u : 0u) | (in.l ? 0x10u : 0u) | (in.zl ? 0x20u : 0u) |
+                        (in.minus ? 0x40u : 0u) | (in.l_js ? 0x80u : 0u));
+    data[5] = (uint8_t)((in.home ? 0x01u : 0u) | (in.capture ? 0x02u : 0u) | (in.gr ? 0x04u : 0u) |
+                        (in.gl ? 0x08u : 0u) | (in.c ? 0x10u : 0u));
+
+    _ns2_pack_stick(&data[6], in.ls_x, in.ls_y);
+    _ns2_pack_stick(&data[9], in.rs_x, in.rs_y);
+
+    data[12] = (s_ns2.features_enabled & NS2_FEATURE_RUMBLE) ? 0x38u : 0x30u;
+    data[13] = in.lt;
+    data[14] = in.rt;
 
     return true;
 }

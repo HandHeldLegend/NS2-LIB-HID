@@ -38,16 +38,16 @@ extern "C" {
 typedef enum
 {
     NS2_DEVTYPE_UNDEFINED,
-    NS2_DEVTYPE_PRO2,       /**< Pro Controller 2. The only type implemented so far. */
+    NS2_DEVTYPE_PRO2,       /**< Pro Controller 2 (BLE). */
     NS2_DEVTYPE_JOYCON2_L,  /**< Reserved, not implemented. */
     NS2_DEVTYPE_JOYCON2_R,  /**< Reserved, not implemented. */
-    NS2_DEVTYPE_GC,         /**< Reserved, not implemented. */
+    NS2_DEVTYPE_GC,         /**< GameCube controller for Nintendo Switch Online (USB). */
 } ns2_devtype_t;
 
 typedef enum
 {
     NS2_TRANSPORT_UNDEFINED,
-    NS2_TRANSPORT_USB, /**< Stubbed, not implemented. */
+    NS2_TRANSPORT_USB, /**< GameCube controller only. */
     NS2_TRANSPORT_BLE,
 } ns2_transport_t;
 
@@ -83,7 +83,24 @@ typedef struct
     uint8_t device_serial[16];
     /** Colors reported in memory block 0x13000. */
     ns2_colordata_s colors;
+    /** USB only: @ref ns2_usb_pairing_t */
+    uint8_t usb_pairing;
 } ns2_device_config_s;
+
+/**
+ * @brief How a USB controller answers the console's pairing commands (0x15).
+ *
+ * Over USB the console pairs the controller for later wireless use. A wired-only controller
+ * (or one that should not take a pairing slot) answers some other way; which way the console
+ * accepts without storing anything is still being measured.
+ */
+typedef enum
+{
+    NS2_USB_PAIRING_NORMAL = 0,   /**< Pair like a retail controller. */
+    NS2_USB_PAIRING_DECLINE,      /**< Answer every pairing step without data. */
+    NS2_USB_PAIRING_SILENT,       /**< Leave every pairing step unanswered. */
+    NS2_USB_PAIRING_FAIL_CONFIRM, /**< Pair, but answer the key confirmation wrongly; store nothing. */
+} ns2_usb_pairing_t;
 
 /**
  * @brief Result of configuration validation or operations that depend on a configured device.
@@ -167,6 +184,10 @@ typedef struct
     uint16_t ls_y; /**< Left stick Y, 12-bit, 2048 center. */
     uint16_t rs_x; /**< Right stick X, 12-bit, 2048 center. */
     uint16_t rs_y; /**< Right stick Y, 12-bit, 2048 center. */
+
+    /** GameCube controller analog triggers, 0 (released) .. 255 (pressed through the click). */
+    uint8_t lt;
+    uint8_t rt;
 } ns2_input_s;
 
 /** Feature flags used by command 0x0C (feature select). */

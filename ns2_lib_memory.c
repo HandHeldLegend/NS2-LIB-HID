@@ -75,11 +75,59 @@ static const uint8_t s_mem_013100[] = {
     0xA8, 0x00, 0x08, 0x3D, 0x2F, 0xED, 0x20, 0x41,
 };
 
+/* --- GameCube controller (NSO), read over USB from a retail controller --- */
+
+/* 0x13040: unknown. */
+static const uint8_t s_mem_gc_013040[] = {
+    0x4C, 0xFE, 0xC3, 0x41, 0x7C, 0x11, 0xDF, 0x3A, 0x4B, 0xCE,
+    0x41, 0xBC, 0x93, 0x35, 0x4E, 0xBC,
+};
+
+/* 0x13080: main stick factory data (unknown layout), up to its calibration. */
+static const uint8_t s_mem_gc_013080[] = {
+    0xFF, 0x47, 0x79, 0x94, 0xB8, 0x86, 0x6B, 0xA0, 0x00, 0x0A,
+    0xA0, 0x00, 0x0A, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xBE, 0xE3, 0x3B, 0xBE, 0xE3,
+    0x3B, 0x06, 0x65, 0x50, 0x06, 0x65, 0x50, 0x0A, 0xFF, 0xFF,
+};
+
+/* 0x130C0: C-stick factory data (unknown layout), up to its calibration. */
+static const uint8_t s_mem_gc_0130C0[] = {
+    0xFF, 0x47, 0x79, 0x94, 0xB8, 0x86, 0x6B, 0xA0, 0x00, 0x0A,
+    0xA0, 0x00, 0x0A, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x18, 0x83, 0x31, 0x18, 0x83,
+    0x31, 0x5F, 0xF4, 0x45, 0x5F, 0xF4, 0x45, 0x0A, 0xFF, 0xFF,
+};
+
+/*
+ * 0x130A8 / 0x130E8: stick calibration, three packed 12-bit X/Y pairs: center, then the distance
+ * to the top/right and to the bottom/left. The full range (2048 +/- 2047): the firmware applies its
+ * own calibration and reports the whole span. (A retail controller's own: about 2030 +1274/-1202.)
+ */
+static const uint8_t s_mem_gc_stick_cal[] = {
+    0x00, 0x08, 0x80, 0xFF, 0xF7, 0x7F, 0xFF, 0xF7, 0x7F,
+};
+
+/* 0x13100: motion sensor calibration (the last float is 9.9: gravity). */
+static const uint8_t s_mem_gc_013100[] = {
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0xE3, 0x75, 0xAE, 0xBC, 0x5B, 0xB6, 0xDA, 0xBE,
+    0x1F, 0x9F, 0x1E, 0x41,
+};
+
+/*
+ * 0x13140: trigger rest values, it seems (a retail controller: 0x24, 0x22, with its triggers resting
+ * near 33). Zero: the firmware reports its triggers over the full range, 0 at rest.
+ */
+static const uint8_t s_mem_gc_013140[] = {
+    0x00, 0x00,
+};
+
 /*
  * Regions that exist but read back fully erased. 0x1FC040 holds user stick calibration and is
  * uninitialised unless the user calibrated the controller.
  */
-static const ns2_memory_block_s s_blocks[] = {
+static const ns2_memory_block_s s_blocks_pro2[] = {
     {0x013000u, sizeof(s_mem_013000), s_mem_013000},
     {0x013040u, sizeof(s_mem_013040), s_mem_013040},
     {0x013060u, 0u, NULL},
@@ -88,6 +136,20 @@ static const ns2_memory_block_s s_blocks[] = {
     {0x0130C0u, sizeof(s_mem_0130C0), s_mem_0130C0},
     {0x0130E8u, sizeof(s_mem_0130E8), s_mem_0130E8},
     {0x013100u, sizeof(s_mem_013100), s_mem_013100},
+    {0x1FC040u, 0u, NULL},
+};
+
+/* 0x13060 and the user calibration at 0x1FC040 read back erased. */
+static const ns2_memory_block_s s_blocks_gc[] = {
+    {0x013000u, sizeof(s_mem_013000), s_mem_013000},
+    {0x013040u, sizeof(s_mem_gc_013040), s_mem_gc_013040},
+    {0x013060u, 0u, NULL},
+    {0x013080u, sizeof(s_mem_gc_013080), s_mem_gc_013080},
+    {0x0130A8u, sizeof(s_mem_gc_stick_cal), s_mem_gc_stick_cal},
+    {0x0130C0u, sizeof(s_mem_gc_0130C0), s_mem_gc_0130C0},
+    {0x0130E8u, sizeof(s_mem_gc_stick_cal), s_mem_gc_stick_cal},
+    {0x013100u, sizeof(s_mem_gc_013100), s_mem_gc_013100},
+    {0x013140u, sizeof(s_mem_gc_013140), s_mem_gc_013140},
     {0x1FC040u, 0u, NULL},
 };
 
@@ -110,9 +172,10 @@ void ns2_memory_init(void)
     uint16_t pid = ns2_config_get_product_id();
     m[20] = (uint8_t)(pid & 0xFFu);
     m[21] = (uint8_t)(pid >> 8);
-    /* Unknown (hardware revision?), copied from a retail Pro Controller 2. */
+    /* Unknown (hardware revision?), copied from a retail Pro Controller 2 / GameCube controller. */
+    bool gc = cfg.type == NS2_DEVTYPE_GC;
     m[22] = 0x01;
-    m[23] = 0x06;
+    m[23] = gc ? 0x04 : 0x06;
     m[24] = 0x01;
     /* Colors: body, buttons, highlight, grip. */
     const ns2_rgb_s *colors[4] = {&cfg.colors.body, &cfg.colors.buttons, &cfg.colors.highlight, &cfg.colors.grip};
@@ -136,9 +199,13 @@ bool ns2_memory_read(uint32_t addr, uint16_t len, uint8_t *out)
     uint32_t addr_end = addr + len;
     bool found = false;
 
-    for (size_t i = 0; i < sizeof(s_blocks) / sizeof(s_blocks[0]); i++)
+    bool gc = ns2_config_get_type() == NS2_DEVTYPE_GC;
+    const ns2_memory_block_s *blocks = gc ? s_blocks_gc : s_blocks_pro2;
+    size_t count = gc ? sizeof(s_blocks_gc) / sizeof(s_blocks_gc[0]) : sizeof(s_blocks_pro2) / sizeof(s_blocks_pro2[0]);
+
+    for (size_t i = 0; i < count; i++)
     {
-        const ns2_memory_block_s *b = &s_blocks[i];
+        const ns2_memory_block_s *b = &blocks[i];
         uint32_t block_end = b->start_addr + b->len;
 
         /* Empty regions only mark the address as known; their contents stay erased. */

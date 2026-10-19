@@ -65,6 +65,16 @@ bool ns2_protocol_generate_inputreport(uint8_t data[NS2_INPUT_REPORT_SIZE]);
  */
 uint16_t ns2_protocol_process_command(const uint8_t *cmd, uint16_t len, uint8_t *out);
 
+/** @brief true once the console started input reports (feature enable over BLE, USB initialise). */
+bool ns2_protocol_reporting(void);
+
+/** GameCube controller USB input report: ID, then 63 bytes. */
+#define NS2_GC_USB_REPORT_ID 0x0Au
+#define NS2_GC_USB_REPORT_SIZE 64u
+
+/** @brief The GameCube controller's USB input report (report ID first); false until reporting. */
+bool ns2_protocol_generate_gc_report(uint8_t data[NS2_GC_USB_REPORT_SIZE]);
+
 #ifdef __cplusplus
 }
 #endif
