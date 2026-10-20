@@ -81,6 +81,11 @@ typedef struct
 
 static ns2_protocol_state_s s_ns2;
 
+/* The pairing key from the last pairing or restored by the firmware (on-air order): kept across
+ * connections, so a console that already paired gets its key confirmation (0x15/0x02) answered. */
+static uint8_t s_ns2_saved_ltk[16];
+static bool s_ns2_saved_ltk_valid;
+
 /* Controller half of the pairing key exchange. Retail controllers always send this value. */
 static const uint8_t s_ns2_pairing_b1[16] = {
     0x5C, 0xF6, 0xEE, 0x79, 0x2C, 0xDF, 0x05, 0xE1,
@@ -157,6 +162,32 @@ void ns2_protocol_reset(void)
     uint8_t paired = s_ns2.paired;
     memset(&s_ns2, 0, sizeof(s_ns2));
     s_ns2.paired = paired || ns2_config_has_host();
+    if (s_ns2_saved_ltk_valid)
+    {
+        memcpy(s_ns2.ltk_wire, s_ns2_saved_ltk, 16);
+        s_ns2.ltk_valid = true;
+    }
+}
+
+void ns2_protocol_set_ltk(const uint8_t ltk[16])
+{
+    _ns2_reverse(ltk, s_ns2_saved_ltk, 16);
+    s_ns2_saved_ltk_valid = true;
+    memcpy(s_ns2.ltk_wire, s_ns2_saved_ltk, 16);
+    s_ns2.ltk_valid = true;
+}
+
+void ns2_protocol_gc_reply_header(const uint8_t *cmd, uint8_t *out, uint16_t *len)
+{
+    if (cmd[0] == 0x01u && cmd[3] == 0x0Cu)
+    {
+        out[1] = 0x00;
+        *len = NS2_CMD_HEADER_LEN;
+    }
+    else if (cmd[0] == 0x0Au && cmd[3] == 0x08u)
+    {
+        out[1] = 0x04;
+    }
 }
 
 void ns2_protocol_set_peer(const uint8_t host_mac[6])
@@ -364,6 +395,8 @@ static uint16_t _ns2_cmd_pairing(uint8_t sub, const uint8_t *data, uint16_t data
         ns2_pairing_s pairing;
         memcpy(pairing.host_mac, s_ns2.peer_mac, 6);
         _ns2_reverse(s_ns2.ltk_wire, pairing.ltk, 16);
+        memcpy(s_ns2_saved_ltk, s_ns2.ltk_wire, 16);
+        s_ns2_saved_ltk_valid = true;
         ns2_config_set_host_mac(pairing.host_mac);
         s_ns2.paired = true;
         ns2_api_hook_set_pairing(&pairing);
@@ -507,6 +540,10 @@ static void _ns2_handle_command_write(const uint8_t *cmd, uint16_t len, uint16_t
     {
         return;
     }
+    if (ns2_config_get_type() == NS2_DEVTYPE_GC)
+    {
+        ns2_protocol_gc_reply_header(cmd, &buf[prefix_len], &resp_len);
+    }
     _ns2_queue_push(resp_handle, buf, (uint16_t)(prefix_len + resp_len));
 }
 
@@ -538,6 +575,16 @@ void ns2_protocol_ble_write(uint16_t handle, const uint8_t *data, uint16_t len)
         break;
 
     case NS2_HANDLE_VIB_COMMAND_VALUE:
+        if (ns2_config_get_type() == NS2_DEVTYPE_GC)
+        {
+            /* The prefix is presumably the rumble state; not decoded yet. */
+            if (len >= NS2_GC_VIB_CMD_PREFIX_LEN + NS2_CMD_HEADER_LEN)
+            {
+                _ns2_handle_command_write(&data[NS2_GC_VIB_CMD_PREFIX_LEN], (uint16_t)(len - NS2_GC_VIB_CMD_PREFIX_LEN),
+                                          NS2_HANDLE_CMD_RESPONSE_VALUE, 0);
+            }
+            break;
+        }
         /* Report ID (1) + left LRA (16) + right LRA (16), then the command. */
         if (len < NS2_PRO2_VIB_CMD_PREFIX_LEN)
         {
@@ -637,6 +684,18 @@ bool ns2_protocol_generate_inputreport(uint8_t data[NS2_INPUT_REPORT_SIZE])
     if (data == NULL || !s_ns2.reporting || !(s_ns2.ccc_input & 0x01u))
     {
         return false;
+    }
+
+    if (ns2_config_get_type() == NS2_DEVTYPE_GC)
+    {
+        /* Over BLE the GameCube controller sends its USB report 0x0A without the ID. */
+        uint8_t gc[NS2_GC_USB_REPORT_SIZE];
+        if (!ns2_protocol_generate_gc_report(gc))
+        {
+            return false;
+        }
+        memcpy(data, &gc[1], NS2_INPUT_REPORT_SIZE);
+        return true;
     }
 
     ns2_input_s in;

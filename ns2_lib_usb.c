@@ -195,11 +195,9 @@ uint16_t ns2_usb_process_command(const uint8_t *data, uint16_t len, uint8_t *out
         return 0;
     }
 
-    uint8_t id = data[0];
-    uint8_t sub = data[3];
     uint16_t n = 0;
 
-    if (id != NS2_CMD_PAIRING || !_ns2_usb_pairing(data, out, &n))
+    if (data[0] != NS2_CMD_PAIRING || !_ns2_usb_pairing(data, out, &n))
     {
         n = ns2_protocol_process_command(data, len, out);
     }
@@ -214,16 +212,7 @@ uint16_t ns2_usb_process_command(const uint8_t *data, uint16_t len, uint8_t *out
     out[4] = 0x00;
     out[5] = 0xF8;
 
-    /* As a retail GameCube controller answers these two */
-    if (id == 0x01u && sub == 0x0Cu)
-    {
-        out[1] = 0x00;
-        n = NS2_CMD_HEADER_LEN;
-    }
-    else if (id == 0x0Au && sub == 0x08u)
-    {
-        out[1] = 0x04;
-    }
+    ns2_protocol_gc_reply_header(data, out, &n);
     return n;
 }
 

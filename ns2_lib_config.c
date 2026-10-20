@@ -50,10 +50,10 @@ ns2_config_status_t ns2_config_validate(const ns2_device_config_s *cfg)
     {
         return NS2_CONFIG_NOT_CONFIGURED;
     }
-    /* Implemented: the Pro Controller 2 over BLE, the GameCube controller over USB. */
+    /* Implemented: the Pro Controller 2 over BLE, the GameCube controller over USB and BLE. */
     bool pro2_ble = cfg->type == NS2_DEVTYPE_PRO2 && cfg->transport == NS2_TRANSPORT_BLE;
-    bool gc_usb = cfg->type == NS2_DEVTYPE_GC && cfg->transport == NS2_TRANSPORT_USB;
-    if (!pro2_ble && !gc_usb)
+    bool gc = cfg->type == NS2_DEVTYPE_GC;
+    if (!pro2_ble && !gc)
     {
         return NS2_CONFIG_UNSUPPORTED;
     }

@@ -128,6 +128,14 @@ bool ns2_api_is_paired(void)
     return ns2_config_has_host();
 }
 
+void ns2_api_set_ltk(const uint8_t ltk[16])
+{
+    if (ltk != NULL)
+    {
+        ns2_protocol_set_ltk(ltk);
+    }
+}
+
 /*
  * Platform hooks (declared in ns2_lib.h): weak definitions — firmware should supply strong replacements.
  */

@@ -37,11 +37,26 @@ extern "C" {
 /** Zero-filled prefix on command responses sent on the extended response attribute. */
 #define NS2_PRO2_CMD_RESPONSE_PREFIX_LEN 0x0Eu
 
+/**
+ * The GameCube controller's writes to the vibration + command attribute: a 5-byte prefix (zero
+ * in every capture so far), then the command. It answers on the first response attribute.
+ */
+#define NS2_GC_VIB_CMD_PREFIX_LEN 0x05u
+
 /** Clear all per-connection state. */
 void ns2_protocol_reset(void);
 
 /** Remember the connected peer (display order); used as the pairing host address. */
 void ns2_protocol_set_peer(const uint8_t host_mac[6]);
+
+/** Restore a stored LTK (MSB first); it survives connection resets. */
+void ns2_protocol_set_ltk(const uint8_t ltk[16]);
+
+/**
+ * @brief Two replies a retail GameCube controller heads differently: 0x01/0x0C (direction 00,
+ * no data) and 0x0A/0x08 (direction 04). Apply after the header is otherwise final.
+ */
+void ns2_protocol_gc_reply_header(const uint8_t *cmd, uint8_t *out, uint16_t *len);
 
 void ns2_protocol_ble_write(uint16_t handle, const uint8_t *data, uint16_t len);
 

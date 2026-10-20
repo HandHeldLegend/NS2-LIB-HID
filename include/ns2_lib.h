@@ -116,6 +116,14 @@ bool ns2_api_generate_inputreport(uint8_t data[NS2_INPUT_REPORT_SIZE]);
 /** @brief true once pairing completed or a stored host address was configured. */
 bool ns2_api_is_paired(void);
 
+/**
+ * @brief Restore the stored pairing key (@ref ns2_pairing_s `ltk`, MSB first).
+ *
+ * A console that already paired confirms the key (0x15/0x02) when it reconnects; without the key
+ * the library can't answer and the console pairs again.
+ */
+void ns2_api_set_ltk(const uint8_t ltk[16]);
+
 /* --- API Platform Hook Functions --- */
 
 /**
