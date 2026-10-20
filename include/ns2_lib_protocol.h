@@ -87,6 +87,9 @@ bool ns2_protocol_reporting(void);
 #define NS2_GC_USB_REPORT_ID 0x0Au
 #define NS2_GC_USB_REPORT_SIZE 64u
 
+void ns2_protocol_gc_input_pack(const ns2_input_s *in, uint8_t out[NS2_GC_INPUT_BLOCK_LEN]);
+void ns2_protocol_gc_input_unpack(const uint8_t in[NS2_GC_INPUT_BLOCK_LEN], ns2_input_s *out);
+
 /** @brief The GameCube controller's USB input report (report ID first); false until reporting. */
 bool ns2_protocol_generate_gc_report(uint8_t data[NS2_GC_USB_REPORT_SIZE]);
 

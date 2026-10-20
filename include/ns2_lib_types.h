@@ -190,6 +190,13 @@ typedef struct
     uint8_t rt;
 } ns2_input_s;
 
+/**
+ * GameCube controller input as its report 0x0A carries it, without the counter, power and
+ * feature bytes: buttons (3), sticks (6), analog L and R. For a link that carries the input to
+ * another device that is the controller (a dongle).
+ */
+#define NS2_GC_INPUT_BLOCK_LEN 11u
+
 /** Feature flags used by command 0x0C (feature select). */
 typedef enum
 {

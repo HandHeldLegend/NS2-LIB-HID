@@ -124,6 +124,15 @@ bool ns2_api_is_paired(void);
  */
 void ns2_api_set_ltk(const uint8_t ltk[16]);
 
+/**
+ * @brief The GameCube controller's input as an @ref NS2_GC_INPUT_BLOCK_LEN block, and back.
+ *
+ * For a gamepad whose dongle is the controller: the gamepad packs what it would report, the
+ * dongle unpacks it in its @ref ns2_api_hook_get_input.
+ */
+void ns2_api_gc_input_pack(const ns2_input_s *in, uint8_t out[NS2_GC_INPUT_BLOCK_LEN]);
+void ns2_api_gc_input_unpack(const uint8_t in[NS2_GC_INPUT_BLOCK_LEN], ns2_input_s *out);
+
 /* --- API Platform Hook Functions --- */
 
 /**

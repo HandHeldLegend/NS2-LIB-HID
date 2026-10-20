@@ -679,6 +679,54 @@ static void _ns2_pack_stick(uint8_t out[3], uint16_t x, uint16_t y)
     out[2] = (uint8_t)(y >> 4);
 }
 
+void ns2_protocol_gc_input_pack(const ns2_input_s *in, uint8_t out[NS2_GC_INPUT_BLOCK_LEN])
+{
+    out[0] = (uint8_t)((in->b ? 0x01u : 0u) | (in->a ? 0x02u : 0u) | (in->y ? 0x04u : 0u) | (in->x ? 0x08u : 0u) |
+                       (in->r ? 0x10u : 0u) | (in->zr ? 0x20u : 0u) | (in->plus ? 0x40u : 0u) |
+                       (in->r_js ? 0x80u : 0u));
+    out[1] = (uint8_t)((in->down ? 0x01u : 0u) | (in->right ? 0x02u : 0u) | (in->left ? 0x04u : 0u) |
+                       (in->up ? 0x08u : 0u) | (in->l ? 0x10u : 0u) | (in->zl ? 0x20u : 0u) |
+                       (in->minus ? 0x40u : 0u) | (in->l_js ? 0x80u : 0u));
+    out[2] = (uint8_t)((in->home ? 0x01u : 0u) | (in->capture ? 0x02u : 0u) | (in->gr ? 0x04u : 0u) |
+                       (in->gl ? 0x08u : 0u) | (in->c ? 0x10u : 0u));
+    _ns2_pack_stick(&out[3], in->ls_x, in->ls_y);
+    _ns2_pack_stick(&out[6], in->rs_x, in->rs_y);
+    out[9] = in->lt;
+    out[10] = in->rt;
+}
+
+void ns2_protocol_gc_input_unpack(const uint8_t in[NS2_GC_INPUT_BLOCK_LEN], ns2_input_s *out)
+{
+    memset(out, 0, sizeof(*out));
+    out->b = (in[0] & 0x01u) != 0;
+    out->a = (in[0] & 0x02u) != 0;
+    out->y = (in[0] & 0x04u) != 0;
+    out->x = (in[0] & 0x08u) != 0;
+    out->r = (in[0] & 0x10u) != 0;
+    out->zr = (in[0] & 0x20u) != 0;
+    out->plus = (in[0] & 0x40u) != 0;
+    out->r_js = (in[0] & 0x80u) != 0;
+    out->down = (in[1] & 0x01u) != 0;
+    out->right = (in[1] & 0x02u) != 0;
+    out->left = (in[1] & 0x04u) != 0;
+    out->up = (in[1] & 0x08u) != 0;
+    out->l = (in[1] & 0x10u) != 0;
+    out->zl = (in[1] & 0x20u) != 0;
+    out->minus = (in[1] & 0x40u) != 0;
+    out->l_js = (in[1] & 0x80u) != 0;
+    out->home = (in[2] & 0x01u) != 0;
+    out->capture = (in[2] & 0x02u) != 0;
+    out->gr = (in[2] & 0x04u) != 0;
+    out->gl = (in[2] & 0x08u) != 0;
+    out->c = (in[2] & 0x10u) != 0;
+    out->ls_x = (uint16_t)(in[3] | ((in[4] & 0x0Fu) << 8));
+    out->ls_y = (uint16_t)((in[4] >> 4) | (in[5] << 4));
+    out->rs_x = (uint16_t)(in[6] | ((in[7] & 0x0Fu) << 8));
+    out->rs_y = (uint16_t)((in[7] >> 4) | (in[8] << 4));
+    out->lt = in[9];
+    out->rt = in[10];
+}
+
 bool ns2_protocol_generate_inputreport(uint8_t data[NS2_INPUT_REPORT_SIZE])
 {
     if (data == NULL || !s_ns2.reporting || !(s_ns2.ccc_input & 0x01u))
@@ -765,20 +813,12 @@ bool ns2_protocol_generate_gc_report(uint8_t data[NS2_GC_USB_REPORT_SIZE])
                         (pwr.charging_status == NS2_CHARGING_ACTIVE ? 0x02u : 0x00u) |
                         (uint8_t)(level << 2));
 
-    data[3] = (uint8_t)((in.b ? 0x01u : 0u) | (in.a ? 0x02u : 0u) | (in.y ? 0x04u : 0u) | (in.x ? 0x08u : 0u) |
-                        (in.r ? 0x10u : 0u) | (in.zr ? 0x20u : 0u) | (in.plus ? 0x40u : 0u) | (in.r_js ? 0x80u : 0u));
-    data[4] = (uint8_t)((in.down ? 0x01u : 0u) | (in.right ? 0x02u : 0u) | (in.left ? 0x04u : 0u) |
-                        (in.up ? 0x08u : 0u) | (in.l ? 0x10u : 0u) | (in.zl ? 0x20u : 0u) |
-                        (in.minus ? 0x40u : 0u) | (in.l_js ? 0x80u : 0u));
-    data[5] = (uint8_t)((in.home ? 0x01u : 0u) | (in.capture ? 0x02u : 0u) | (in.gr ? 0x04u : 0u) |
-                        (in.gl ? 0x08u : 0u) | (in.c ? 0x10u : 0u));
-
-    _ns2_pack_stick(&data[6], in.ls_x, in.ls_y);
-    _ns2_pack_stick(&data[9], in.rs_x, in.rs_y);
-
+    uint8_t block[NS2_GC_INPUT_BLOCK_LEN];
+    ns2_protocol_gc_input_pack(&in, block);
+    memcpy(&data[3], block, 9);
     data[12] = (s_ns2.features_enabled & NS2_FEATURE_RUMBLE) ? 0x38u : 0x30u;
-    data[13] = in.lt;
-    data[14] = in.rt;
+    data[13] = block[9];
+    data[14] = block[10];
 
     return true;
 }

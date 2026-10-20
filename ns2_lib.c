@@ -128,6 +128,22 @@ bool ns2_api_is_paired(void)
     return ns2_config_has_host();
 }
 
+void ns2_api_gc_input_pack(const ns2_input_s *in, uint8_t out[NS2_GC_INPUT_BLOCK_LEN])
+{
+    if (in != NULL && out != NULL)
+    {
+        ns2_protocol_gc_input_pack(in, out);
+    }
+}
+
+void ns2_api_gc_input_unpack(const uint8_t in[NS2_GC_INPUT_BLOCK_LEN], ns2_input_s *out)
+{
+    if (in != NULL && out != NULL)
+    {
+        ns2_protocol_gc_input_unpack(in, out);
+    }
+}
+
 void ns2_api_set_ltk(const uint8_t ltk[16])
 {
     if (ltk != NULL)
